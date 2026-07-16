@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>约会日程规划</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; background-color: #fff5f5; color: #333; padding: 20px; max-width: 600px; margin: 0 auto; }
+    h1 { text-align: center; color: #e74c6f; margin-bottom: 20px; font-size: 24px; }
+    h2 { font-size: 18px; color: #555; margin-bottom: 15px; }
+    section { background: #fff; border-radius: 12px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.06); }
+    .tab-bar { display: flex; gap: 0; margin-bottom: 24px; border-radius: 10px; overflow: hidden; border: 2px solid #e74c6f; }
+    .tab-bar button { flex: 1; padding: 10px; border: none; background: #fff; color: #e74c6f; font-size: 15px; font-weight: bold; cursor: pointer; transition: all 0.2s; }
+    .tab-bar button.active { background: #e74c6f; color: #fff; }
+    .date-picker-group { display: flex; gap: 20px; flex-wrap: wrap; }
+    .date-picker-item { flex: 1; min-width: 200px; }
+    .date-picker-item label { display: block; font-size: 14px; color: #888; margin-bottom: 6px; }
+    .date-picker-item input[type="datetime-local"] { width: 100%; padding: 10px 12px; border: 1px solid #ddd; border-radius: 8px; font-size: 16px; color: #333; cursor: pointer; outline: none; transition: border-color 0.2s; }
+    .date-picker-item input[type="datetime-local"]:focus { border-color: #e74c6f; }
+    .date-display { margin-top: 8px; font-size: 20px; font-weight: bold; color: #e74c6f; min-height: 28px; }
+    .error-msg { color: #e74c3c; font-size: 14px; margin-top: 10px; min-height: 20px; }
+    .hint { font-size: 14px; font-weight: normal; color: #aaa; }
+    .activity-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
+    .activity-card, .food-card { position: relative; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 16px 8px; background: #fff; border: 2px solid #eee; border-radius: 12px; cursor: pointer; transition: all 0.2s; user-select: none; }
+    .activity-card:hover, .food-card:hover { border-color: #e74c6f; transform: translateY(-2px); }
+    .activity-card.selected, .food-card.selected { background: #fff0f3; border-color: #e74c6f; }
+    .card-check { position: absolute; top: 6px; right: 8px; font-size: 14px; color: #e74c6f; font-weight: bold; opacity: 0; transition: opacity 0.2s; }
+    .selected .card-check { opacity: 1; }
+    .card-icon { font-size: 32px; margin-bottom: 6px; }
+    .card-name { font-size: 13px; color: #555; text-align: center; }
+    .selected .card-name { color: #e74c6f; font-weight: bold; }
+    .food-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+    .submit-section { text-align: center; padding: 10px 20px; }
+    .submit-btn { width: 100%; padding: 14px; background: #e74c6f; color: #fff; border: none; border-radius: 10px; font-size: 18px; font-weight: bold; cursor: pointer; transition: background 0.2s; }
+    .submit-btn:hover { background: #d43a60; }
+    .submit-btn:active { background: #c03050; }
+    .success-msg { color: #27ae60; font-size: 16px; font-weight: bold; margin-bottom: 10px; min-height: 24px; }
+    .admin-toolbar { display: flex; align-items: center; gap: 12px; margin-bottom: 20px; }
+    .refresh-btn { padding: 8px 20px; background: #e74c6f; color: #fff; border: none; border-radius: 8px; font-size: 14px; cursor: pointer; transition: background 0.2s; }
+    .refresh-btn:hover { background: #d43a60; }
+    .last-update { font-size: 13px; color: #aaa; }
+    .submissions-list { display: flex; flex-direction: column; gap: 16px; }
+    .submission-card { background: #fff; border-radius: 12px; padding: 16px 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.06); border-left: 4px solid #e74c6f; }
+    .submission-time { font-size: 13px; color: #999; margin-bottom: 10px; padding-bottom: 8px; border-bottom: 1px solid #f0f0f0; }
+    .submission-row { font-size: 15px; color: #333; margin-bottom: 6px; line-height: 1.6; }
+    .submission-row .label { color: #888; font-weight: bold; }
+    .activity-tag { display: inline-block; background: #fff0f3; color: #e74c6f; padding: 2px 10px; border-radius: 12px; font-size: 13px; margin: 2px 4px 2px 0; }
+    .empty-msg { text-align: center; color: #ccc; font-size: 16px; padding: 40px 0; }
+    @media (max-width: 480px) { .activity-grid { grid-template-columns: repeat(2, 1fr); } .food-grid { grid-template-columns: repeat(2, 1fr); } }
+  </style>
+</head>
+<body>
+  <h1>约会日程规划</h1>
+  <div class="tab-bar">
+    <button id="tabUser" class="active" onclick="switchTab('user')">用户选择</button>
+    <button id="tabAdmin" onclick="switchTab('admin')">管理员查看</button>
+  </div>
+
+  <div id="userPage">
+    <section>
+      <h2>选择约会日期</h2>
+      <div class="date-picker-group">
+        <div class="date-picker-item">
+          <label for="startDate">开始日期</label>
+          <input type="datetime-local" id="startDate">
+          <p id="startDisplay" class="date-display"></p>
+        </div>
+        <div class="date-picker-item">
+          <label for="endDate">结束日期</label>
+          <input type="datetime-local" id="endDate">
+          <p id="endDisplay" class="date-display"></p>
+        </div>
+      </div>
+      <p id="dateError" class="error-msg"></p>
+    </section>
+
+    <section>
+      <h2>选择约会活动 <span class="hint">（可多选）</span></h2>
+      <div class="activity-grid">
+        <div class="activity-card" data-name="看电影"><span class="card-check">✓</span><span class="card-icon">🎬</span><span class="card-name">看电影</span></div>
+        <div class="activity-card" data-name="手工DIY"><span class="card-check">✓</span><span class="card-icon">🎨</span><span class="card-name">手工DIY</span></div>
+        <div class="activity-card" data-name="密室逃脱"><span class="card-check">✓</span><span class="card-icon">🔐</span><span class="card-name">密室逃脱</span></div>
+        <div class="activity-card" data-name="剧本杀"><span class="card-check">✓</span><span class="card-icon">🎭</span><span class="card-name">剧本杀</span></div>
+        <div class="activity-card" data-name="烘焙体验"><span class="card-check">✓</span><span class="card-icon">🧁</span><span class="card-name">烘焙体验</span></div>
+        <div class="activity-card" data-name="游乐园"><span class="card-check">✓</span><span class="card-icon">🎢</span><span class="card-name">游乐园</span></div>
+        <div class="activity-card" data-name="网吧"><span class="card-check">✓</span><span class="card-icon">💻</span><span class="card-name">网吧</span></div>
+        <div class="activity-card" data-name="逛公园"><span class="card-check">✓</span><span class="card-icon">🌳</span><span class="card-name">逛公园</span></div>
+      </div>
+    </section>
+
+    <section>
+      <h2>选择约会美食 <span class="hint">（单选）</span></h2>
+      <div class="food-grid">
+        <div class="food-card" data-name="火锅"><span class="card-check">✓</span><span class="card-icon">🍲</span><span class="card-name">火锅</span></div>
+        <div class="food-card" data-name="烤肉"><span class="card-check">✓</span><span class="card-icon">🥩</span><span class="card-name">烤肉</span></div>
+        <div class="food-card" data-name="烤鱼"><span class="card-check">✓</span><span class="card-icon">🐟</span><span class="card-name">烤鱼</span></div>
+        <div class="food-card" data-name="日料"><span class="card-check">✓</span><span class="card-icon">🍣</span><span class="card-name">日料</span></div>
+        <div class="food-card" data-name="西餐"><span class="card-check">✓</span><span class="card-icon">🍽️</span><span class="card-name">西餐</span></div>
+        <div class="food-card" data-name="自助餐"><span class="card-check">✓</span><span class="card-icon">🥘</span><span class="card-name">自助餐</span></div>
+      </div>
+    </section>
+
+    <section class="submit-section">
+      <p id="submitError" class="error-msg"></p>
+      <p id="submitSuccess" class="success-msg"></p>
+      <button id="submitBtn" class="submit-btn">提交约会计划</button>
+    </section>
+  </div>
+
+  <div id="adminPage" style="display:none;">
+    <div class="admin-toolbar">
+      <button id="refreshBtn" class="refresh-btn" onclick="loadAdminData()">刷新数据</button>
+      <span id="lastUpdate" class="last-update"></span>
+    </div>
+    <div id="submissionsList" class="submissions-list">
+      <p class="empty-msg">暂无提交记录</p>
+    </div>
+  </div>
+
+  <script>
+    function switchTab(tab) {
+      document.getElementById("tabUser").className = tab === "user" ? "active" : "";
+      document.getElementById("tabAdmin").className = tab === "admin" ? "active" : "";
+      document.getElementById("userPage").style.display = tab === "user" ? "block" : "none";
+      document.getElementById("adminPage").style.display = tab === "admin" ? "block" : "none";
+      if (tab === "admin") loadAdminData();
+    }
+
+    function formatDate(dateStr) {
+      var d = new Date(dateStr);
+      return (d.getMonth() + 1) + "月" + d.getDate() + "日 " + d.getHours() + "时";
+    }
+
+    function setTodayMin() {
+      var today = new Date();
+      var todayStr = today.getFullYear() + "-" + String(today.getMonth()+1).padStart(2,"0") + "-" + String(today.getDate()).padStart(2,"0") + "T00:00";
+      var sd = document.getElementById("startDate");
+      var ed = document.getElementById("endDate");
+      sd.min = todayStr;
+      ed.min = todayStr;
+      sd.addEventListener("change", function() {
+        document.getElementById("startDisplay").textContent = formatDate(this.value);
+        ed.min = this.value;
+        document.getElementById("endDisplay").textContent = "";
+        ed.value = "";
+      });
+      ed.addEventListener("change", function() {
+        document.getElementById("endDisplay").textContent = formatDate(this.value);
+      });
+    }
+
+    function initActivityCards() {
+      document.querySelectorAll(".activity-card").forEach(function(card) {
+        card.addEventListener("click", function() {
+          card.classList.toggle("selected");
+        });
+      });
+    }
+
+    function initFoodCards() {
+      document.querySelectorAll(".food-card").forEach(function(card) {
+        card.addEventListener("click", function() {
+          document.querySelectorAll(".food-card").forEach(function(c) { c.classList.remove("selected"); });
+          card.classList.add("selected");
+        });
+      });
+    }
+
+    function initSubmit() {
+      document.getElementById("submitBtn").addEventListener("click", function() {
+        var err = document.getElementById("submitError");
+        var suc = document.getElementById("submitSuccess");
+        err.textContent = ""; suc.textContent = "";
+        var sd = document.getElementById("startDate").value;
+        var ed = document.getElementById("endDate").value;
+        if (!sd) { err.textContent = "请选择约会开始日期"; return; }
+        if (!ed) { err.textContent = "请选择约会结束日期"; return; }
+        if (ed < sd) { err.textContent = "结束日期不能早于开始日期"; return; }
+        var acts = [];
+        document.querySelectorAll(".activity-card.selected").forEach(function(c) { acts.push(c.dataset.name); });
+        if (acts.length === 0) { err.textContent = "请至少选择一个活动"; return; }
+        var food = "";
+        var fc = document.querySelector(".food-card.selected");
+        if (fc) food = fc.dataset.name;
+        if (!food) { err.textContent = "请至少选择一个食物"; return; }
+        var data = { id: Date.now(), startTime: new Date().toLocaleString("zh-CN"), startDate: formatDate(sd), endDate: formatDate(ed), activities: acts, food: food };
+        var list = JSON.parse(localStorage.getItem("datePlannerSubmissions") || "[]");
+        list.push(data);
+        localStorage.setItem("datePlannerSubmissions", JSON.stringify(list));
+        suc.textContent = "提交成功！感谢你的选择";
+        err.textContent = "";
+      });
+    }
+
+    function loadAdminData() {
+      var list = JSON.parse(localStorage.getItem("datePlannerSubmissions") || "[]");
+      var el = document.getElementById("submissionsList");
+      if (list.length === 0) { el.innerHTML = '<p class="empty-msg">暂无提交记录</p>'; return; }
+      var html = "";
+      for (var i = list.length - 1; i >= 0; i--) {
+        var item = list[i];
+        var tags = "";
+        for (var j = 0; j < item.activities.length; j++) { tags += '<span class="activity-tag">' + item.activities[j] + '</span>'; }
+        html += '<div class="submission-card"><div class="submission-time">提交时间: ' + item.startTime + '</div><div class="submission-row"><span class="label">开始日期:</span> ' + item.startDate + '</div><div class="submission-row"><span class="label">结束日期:</span> ' + item.endDate + '</div><div class="submission-row"><span class="label">活动:</span> ' + tags + '</div><div class="submission-row"><span class="label">食物:</span> ' + item.food + '</div></div>';
+      }
+      el.innerHTML = html;
+      var now = new Date();
+      document.getElementById("lastUpdate").textContent = "最后更新: " + now.getHours() + ":" + String(now.getMinutes()).padStart(2,"0") + ":" + String(now.getSeconds()).padStart(2,"0");
+    }
+
+    document.addEventListener("DOMContentLoaded", function() { setTodayMin(); initActivityCards(); initFoodCards(); initSubmit(); });
+  </script>
+</body>
+</html>
